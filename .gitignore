@@ -1,5 +1,7 @@
 *.temp*
 
+.venv
+
 # Compiled source #
 ###################
 *.com
