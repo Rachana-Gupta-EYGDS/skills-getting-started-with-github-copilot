@@ -20,11 +20,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Build participants list HTML
+        let participantsHtml = "";
+        if (Array.isArray(details.participants) && details.participants.length > 0) {
+          const items = details.participants
+            .map((p) => {
+              // show initials badge + name/email
+              const initials = (p.name || p.email || "")
+                .split(" ")
+                .map(s => s[0] || "")
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+              const label = p.name ? `${p.name} (${p.email || ""})` : p.email || "Unknown";
+              return `<li><span class="participant-badge">${initials || "?"}</span><span>${label}</span><button type="button" class="delete-btn" data-activity="${name}" data-email="${p.email || p}" title="Remove participant">✕</button></li>`;
+            })
+            .join("");
+          participantsHtml = `<div class="participants-section">
+              <h5>Participants</h5>
+              <ul class="participants-list">${items}</ul>
+            </div>`;
+        } else {
+          participantsHtml = `<div class="participants-section">
+              <h5>Participants</h5>
+              <div class="participants-empty">No participants yet</div>
+            </div>`;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHtml}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -35,10 +63,58 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = name;
         activitySelect.appendChild(option);
       });
+
+      // Attach delete button handlers
+      attachDeleteButtonHandlers();
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
     }
+  }
+
+  // Function to handle delete button clicks
+  function attachDeleteButtonHandlers() {
+    const deleteButtons = document.querySelectorAll(".delete-btn");
+    deleteButtons.forEach((btn) => {
+      btn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        const activity = btn.dataset.activity;
+        const email = btn.dataset.email;
+
+        try {
+          const response = await fetch(
+            `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+          const result = await response.json();
+
+          if (response.ok) {
+            messageDiv.textContent = result.message;
+            messageDiv.className = "success";
+            // Refresh activities list
+            fetchActivities();
+          } else {
+            messageDiv.textContent = result.detail || "An error occurred";
+            messageDiv.className = "error";
+          }
+
+          messageDiv.classList.remove("hidden");
+
+          // Hide message after 5 seconds
+          setTimeout(() => {
+            messageDiv.classList.add("hidden");
+          }, 5000);
+        } catch (error) {
+          messageDiv.textContent = "Failed to remove participant. Please try again.";
+          messageDiv.className = "error";
+          messageDiv.classList.remove("hidden");
+          console.error("Error removing participant:", error);
+        }
+      });
+    });
   }
 
   // Handle form submission
